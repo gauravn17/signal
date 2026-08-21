@@ -142,7 +142,7 @@ Because this stage is the bottlenecked one (GitHub rate limits, multi-step
 reasoning cost), it doesn't run inline in an API request — it's handed off
 to a background job queue (see below) so the API stays responsive.
 
-## What "distributed systems" means here (honestly)
+## What "distributed systems" means here 
 
 This is a solo project at hundreds-to-low-thousands-of-resumes scale, not a
 system that needs real multi-node infrastructure — and it doesn't pretend
