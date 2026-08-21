@@ -23,7 +23,7 @@ considered done).
   Test with a mocked HTTP client (`respx` or `unittest.mock`) — no real
   network calls, no real token needed.
 
-- [ ] **2. Website service (`services/website.py`)**
+- [x] **2. Website service (`services/website.py`)**
   Given a URL, check it's live (HTTP GET, follow redirects, timeout) and
   return status + raw text/HTML content (or `None` if unreachable). Test with
   mocked HTTP responses covering: live site, 404, timeout/connection error.
