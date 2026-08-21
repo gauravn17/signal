@@ -28,7 +28,7 @@ considered done).
   return status + raw text/HTML content (or `None` if unreachable). Test with
   mocked HTTP responses covering: live site, 404, timeout/connection error.
 
-- [ ] **3. Extend `LLMClient` for tool-calling**
+- [x] **3. Extend `LLMClient` for tool-calling**
   Add a method to the `LLMClient` protocol (e.g. `agentic_run(system, tools,
   tool_executor, response_model, max_steps)`) that runs a tool-calling loop:
   model picks a tool call or produces final structured output; loop executes
