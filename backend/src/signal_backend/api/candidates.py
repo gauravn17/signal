@@ -77,6 +77,28 @@ def get_candidate(candidate_id: UUID, session: Session = Depends(get_session)):
     return CandidateDetail(candidate=candidate, match_results=match_results)
 
 
+def get_latest_stage1_result(session: Session, candidate_id: UUID) -> MatchResult | None:
+    return session.exec(
+        select(MatchResult)
+        .where(MatchResult.candidate_id == candidate_id, MatchResult.stage == PipelineStage.stage1_bulk)
+        .order_by(MatchResult.created_at.desc())
+    ).first()
+
+
+def run_and_persist_stage2(session: Session, candidate: Candidate, jd: JobDescription) -> MatchResult:
+    """Shared by the single-candidate verify endpoint and the shortlist endpoint.
+    Raises ValueError if Stage 1 hasn't run yet — callers map that to a 400."""
+    stage1_result = get_latest_stage1_result(session, candidate.id)
+    if stage1_result is None:
+        raise ValueError(f"Candidate {candidate.id} has no Stage 1 result; Stage 1 must run before Stage 2")
+
+    match_result = run_stage2(candidate, jd, stage1_result)
+    session.add(match_result)
+    session.commit()
+    session.refresh(match_result)
+    return match_result
+
+
 @router.post("/{candidate_id}/verify", response_model=MatchResult)
 def verify_candidate(candidate_id: UUID, session: Session = Depends(get_session)):
     candidate = session.get(Candidate, candidate_id)
@@ -84,16 +106,7 @@ def verify_candidate(candidate_id: UUID, session: Session = Depends(get_session)
         raise HTTPException(status_code=404, detail="Candidate not found")
     jd = session.get(JobDescription, candidate.job_description_id)
 
-    stage1_result = session.exec(
-        select(MatchResult)
-        .where(MatchResult.candidate_id == candidate_id, MatchResult.stage == PipelineStage.stage1_bulk)
-        .order_by(MatchResult.created_at.desc())
-    ).first()
-    if stage1_result is None:
-        raise HTTPException(status_code=400, detail="Stage 1 must run before Stage 2 verification")
-
-    match_result = run_stage2(candidate, jd, stage1_result)
-    session.add(match_result)
-    session.commit()
-    session.refresh(match_result)
-    return match_result
+    try:
+        return run_and_persist_stage2(session, candidate, jd)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

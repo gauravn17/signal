@@ -66,7 +66,7 @@ considered done).
   `MatchResult`s if present. Test via `TestClient` with the fake LLM/tool
   client, same pattern as `tests/test_api.py`.
 
-- [ ] **7. Shortlist selection endpoint**
+- [x] **7. Shortlist selection endpoint**
   `POST /job-descriptions/{id}/shortlist` — accepts a list of candidate IDs
   (the hiring manager's manual picks from the Stage 1 dashboard, per
   `CLAUDE.md`'s "funnels 1000s down to 50-150" framing) and enqueues Stage 2
