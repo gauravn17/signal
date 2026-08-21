@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -16,4 +16,4 @@ class Candidate(SQLModel, table=True):
     website_url: Optional[str] = None
     # Fields extracted from the resume in Stage 1, e.g. years_experience, skills, employment_history
     extracted_fields: dict = Field(default_factory=dict, sa_column=Column(JSON))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

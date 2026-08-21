@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
@@ -18,4 +18,4 @@ class JobDescription(SQLModel, table=True):
     raw_text: str
     # Parsed structured requirements, each: {text, category, source: "generic" | "hiring_team_free_text"}
     requirements: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
