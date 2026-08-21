@@ -59,7 +59,7 @@ considered done).
   Unit test with the fake tool-calling client from step 3 asserting the
   mapping from gathered evidence to confidence level.
 
-- [ ] **6. API: trigger + retrieve Stage 2 verification**
+- [x] **6. API: trigger + retrieve Stage 2 verification**
   `POST /candidates/{id}/verify` — runs `run_stage2` synchronously for one
   candidate, stores and returns the resulting `MatchResult`. `GET
   /candidates/{id}` — returns the candidate plus both Stage 1 and Stage 2
