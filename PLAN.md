@@ -40,7 +40,7 @@ considered done).
   Flag if Groq's currently available models don't support reliable tool
   calling — fall back to a simpler fixed-sequence-with-early-exit design if so.
 
-- [ ] **4. Stage 2 orchestrator (`pipeline/stage2/verify.py`)**
+- [x] **4. Stage 2 orchestrator (`pipeline/stage2/verify.py`)**
   Replace the `NotImplementedError` stub. Given a `Candidate` + its Stage 1
   `MatchResult`, run the agentic loop with tools `check_github` and
   `check_website` (from steps 1–2). Branch per `CLAUDE.md`: no GitHub URL ->
