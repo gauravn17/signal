@@ -1,3 +1,13 @@
+def test_list_job_descriptions(client):
+    client.post("/job-descriptions", json={"title": "Backend Engineer", "raw_text": "..."})
+    client.post("/job-descriptions", json={"title": "Frontend Engineer", "raw_text": "..."})
+
+    response = client.get("/job-descriptions")
+    assert response.status_code == 200
+    titles = {jd["title"] for jd in response.json()}
+    assert {"Backend Engineer", "Frontend Engineer"} <= titles
+
+
 def test_create_job_description_and_candidate(client, run_queued_jobs):
     jd_response = client.post(
         "/job-descriptions",

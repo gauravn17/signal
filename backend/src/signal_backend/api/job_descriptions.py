@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from signal_backend.api.candidates import VerifyJobResponse
 from signal_backend.db.session import get_session
@@ -32,6 +32,11 @@ def create_job_description(payload: JobDescriptionCreate, session: Session = Dep
     session.commit()
     session.refresh(jd)
     return jd
+
+
+@router.get("", response_model=list[JobDescription])
+def list_job_descriptions(session: Session = Depends(get_session)):
+    return session.exec(select(JobDescription).order_by(JobDescription.created_at.desc())).all()
 
 
 @router.get("/{jd_id}", response_model=JobDescription)
