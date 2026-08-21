@@ -73,7 +73,7 @@ considered done).
   for each. For now this can call `run_stage2` in a loop synchronously;
   background execution is step 8.
 
-- [ ] **8. Move Stage 2 to the Redis/RQ job queue**
+- [x] **8. Move Stage 2 to the Redis/RQ job queue**
   Wire up `rq` (already a dependency) with a worker process. Stage 2 calls
   from step 7 enqueue jobs instead of running inline; add a `GET
   /candidates/{id}/verify-status` (or similar) to poll job state. This is the

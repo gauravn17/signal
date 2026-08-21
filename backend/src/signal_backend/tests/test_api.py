@@ -1,4 +1,4 @@
-def test_create_job_description_and_candidate(client):
+def test_create_job_description_and_candidate(client, run_queued_jobs):
     jd_response = client.post(
         "/job-descriptions",
         json={"title": "Backend Engineer", "raw_text": "We need a backend engineer with 5+ years Python."},
@@ -25,15 +25,28 @@ def test_create_job_description_and_candidate(client):
 
     verify_response = client.post(f"/candidates/{candidate_id}/verify")
     assert verify_response.status_code == 200
-    stage2_result = verify_response.json()
-    assert stage2_result["stage"] == 2
-    assert stage2_result["evidence_confidence"] == "thin"
+    job = verify_response.json()
+    assert job["status"] in ("queued", "started", "finished")
+
+    run_queued_jobs()
+
+    status_response = client.get(f"/jobs/{job['job_id']}")
+    assert status_response.status_code == 200
+    status = status_response.json()
+    assert status["status"] == "finished"
+    assert status["result"]["stage"] == 2
+    assert status["result"]["evidence_confidence"] == "thin"
 
     detail_response = client.get(f"/candidates/{candidate_id}")
     assert detail_response.status_code == 200
     detail = detail_response.json()
     assert len(detail["match_results"]) == 2
     assert {m["stage"] for m in detail["match_results"]} == {1, 2}
+
+
+def test_job_status_404_for_unknown_job(client):
+    response = client.get("/jobs/does-not-exist")
+    assert response.status_code == 404
 
 
 def test_verify_before_stage1_returns_400(client):
@@ -60,7 +73,7 @@ def test_verify_before_stage1_returns_400(client):
     assert response.status_code == 400
 
 
-def test_shortlist_runs_stage2_for_multiple_candidates(client):
+def test_shortlist_runs_stage2_for_multiple_candidates(client, run_queued_jobs):
     jd_response = client.post(
         "/job-descriptions",
         json={"title": "Backend Engineer", "raw_text": "We need a backend engineer with 5+ years Python."},
@@ -78,9 +91,15 @@ def test_shortlist_runs_stage2_for_multiple_candidates(client):
 
     shortlist_response = client.post(f"/job-descriptions/{jd_id}/shortlist", json={"candidate_ids": candidate_ids})
     assert shortlist_response.status_code == 200
-    results = shortlist_response.json()
-    assert len(results) == 2
-    assert all(r["stage"] == 2 for r in results)
+    jobs = shortlist_response.json()
+    assert len(jobs) == 2
+
+    run_queued_jobs()
+
+    for job in jobs:
+        status = client.get(f"/jobs/{job['job_id']}").json()
+        assert status["status"] == "finished"
+        assert status["result"]["stage"] == 2
 
 
 def test_shortlist_rejects_candidate_from_other_jd(client):

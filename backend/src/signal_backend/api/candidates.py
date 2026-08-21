@@ -5,10 +5,12 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from signal_backend.db.session import get_session
-from signal_backend.models import Candidate, JobDescription, MatchResult, PipelineStage
+from signal_backend.jobs import verify_candidate_job
+from signal_backend.models import Candidate, JobDescription, MatchResult
 from signal_backend.pipeline.stage1.extract import run_stage1
-from signal_backend.pipeline.stage2.verify import run_stage2
+from signal_backend.services.queue import get_stage2_queue
 from signal_backend.services.resume_parser import extract_resume_text
+from signal_backend.services.stage2_service import get_latest_stage1_result
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 
@@ -21,6 +23,11 @@ class CandidateWithMatch(BaseModel):
 class CandidateDetail(BaseModel):
     candidate: Candidate
     match_results: list[MatchResult]
+
+
+class VerifyJobResponse(BaseModel):
+    job_id: str
+    status: str
 
 
 @router.post("", response_model=CandidateWithMatch)
@@ -77,36 +84,17 @@ def get_candidate(candidate_id: UUID, session: Session = Depends(get_session)):
     return CandidateDetail(candidate=candidate, match_results=match_results)
 
 
-def get_latest_stage1_result(session: Session, candidate_id: UUID) -> MatchResult | None:
-    return session.exec(
-        select(MatchResult)
-        .where(MatchResult.candidate_id == candidate_id, MatchResult.stage == PipelineStage.stage1_bulk)
-        .order_by(MatchResult.created_at.desc())
-    ).first()
-
-
-def run_and_persist_stage2(session: Session, candidate: Candidate, jd: JobDescription) -> MatchResult:
-    """Shared by the single-candidate verify endpoint and the shortlist endpoint.
-    Raises ValueError if Stage 1 hasn't run yet — callers map that to a 400."""
-    stage1_result = get_latest_stage1_result(session, candidate.id)
-    if stage1_result is None:
-        raise ValueError(f"Candidate {candidate.id} has no Stage 1 result; Stage 1 must run before Stage 2")
-
-    match_result = run_stage2(candidate, jd, stage1_result)
-    session.add(match_result)
-    session.commit()
-    session.refresh(match_result)
-    return match_result
-
-
-@router.post("/{candidate_id}/verify", response_model=MatchResult)
+@router.post("/{candidate_id}/verify", response_model=VerifyJobResponse)
 def verify_candidate(candidate_id: UUID, session: Session = Depends(get_session)):
+    """Enqueues Stage 2 verification (the bottlenecked, GitHub-rate-limited
+    stage) onto the background job queue rather than running it inline.
+    Poll GET /jobs/{job_id} for the result."""
     candidate = session.get(Candidate, candidate_id)
     if candidate is None:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    jd = session.get(JobDescription, candidate.job_description_id)
 
-    try:
-        return run_and_persist_stage2(session, candidate, jd)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if get_latest_stage1_result(session, candidate_id) is None:
+        raise HTTPException(status_code=400, detail="Stage 1 must run before Stage 2 verification")
+
+    job = get_stage2_queue().enqueue(verify_candidate_job, str(candidate_id))
+    return VerifyJobResponse(job_id=job.id, status=job.get_status())

@@ -4,10 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session
 
-from signal_backend.api.candidates import run_and_persist_stage2
+from signal_backend.api.candidates import VerifyJobResponse
 from signal_backend.db.session import get_session
-from signal_backend.models import Candidate, JobDescription, MatchResult
+from signal_backend.jobs import verify_candidate_job
+from signal_backend.models import Candidate, JobDescription
 from signal_backend.pipeline.stage1.parse_jd import parse_job_description
+from signal_backend.services.queue import get_stage2_queue
+from signal_backend.services.stage2_service import get_latest_stage1_result
 
 router = APIRouter(prefix="/job-descriptions", tags=["job-descriptions"])
 
@@ -39,22 +42,22 @@ def get_job_description(jd_id: UUID, session: Session = Depends(get_session)):
     return jd
 
 
-@router.post("/{jd_id}/shortlist", response_model=list[MatchResult])
+@router.post("/{jd_id}/shortlist", response_model=list[VerifyJobResponse])
 def shortlist_candidates(jd_id: UUID, payload: ShortlistRequest, session: Session = Depends(get_session)):
-    """Runs Stage 2 verification for a hiring manager's picked subset of
-    Stage 1 candidates. Synchronous for now — step 8 moves this onto a
-    background job queue since Stage 2 is the bottlenecked stage."""
+    """Enqueues Stage 2 verification for a hiring manager's picked subset of
+    Stage 1 candidates. Poll GET /jobs/{job_id} per candidate for results."""
     jd = session.get(JobDescription, jd_id)
     if jd is None:
         raise HTTPException(status_code=404, detail="Job description not found")
 
-    results = []
+    queue = get_stage2_queue()
+    responses = []
     for candidate_id in payload.candidate_ids:
         candidate = session.get(Candidate, candidate_id)
         if candidate is None or candidate.job_description_id != jd.id:
             raise HTTPException(status_code=400, detail=f"Candidate {candidate_id} not found for this job description")
-        try:
-            results.append(run_and_persist_stage2(session, candidate, jd))
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    return results
+        if get_latest_stage1_result(session, candidate_id) is None:
+            raise HTTPException(status_code=400, detail=f"Candidate {candidate_id} has no Stage 1 result")
+        job = queue.enqueue(verify_candidate_job, str(candidate_id))
+        responses.append(VerifyJobResponse(job_id=job.id, status=job.get_status()))
+    return responses

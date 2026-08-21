@@ -78,6 +78,31 @@ def fake_github_client(monkeypatch):
     return fake
 
 
+@pytest.fixture(autouse=True)
+def clear_stage2_queue():
+    from signal_backend.services.queue import get_stage2_queue
+
+    get_stage2_queue().empty()
+    yield
+    get_stage2_queue().empty()
+
+
+@pytest.fixture
+def run_queued_jobs():
+    """Runs all currently-enqueued Stage 2 jobs synchronously, in-process
+    (rq's SimpleWorker doesn't fork), so tests don't need a live worker."""
+
+    def _run():
+        from rq import SimpleWorker
+
+        from signal_backend.services.queue import get_stage2_queue
+
+        queue = get_stage2_queue()
+        SimpleWorker([queue], connection=queue.connection).work(burst=True)
+
+    return _run
+
+
 @pytest.fixture
 def client(fake_llm_client, fake_github_client):
     with TestClient(app) as c:
