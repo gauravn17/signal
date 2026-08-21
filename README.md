@@ -24,7 +24,7 @@ pipeline, by building something for a problem I've personally lived.
 
 ## Who it's for
 
-Traditional/enterprise hiring teams (think: a cloud security team at a large
+Traditional/enterprise hiring teams (think: a software team at a large
 company), not early-stage, AI-native startups already comfortable with
 unconventional hiring processes. If your team would consider a platform like
 [Rounds.so](https://rounds.so) — which skips resume review entirely and
