@@ -49,7 +49,7 @@ considered done).
   against whatever evidence was gathered. Cap tool calls per candidate (e.g.
   max 5) to bound GitHub API usage.
 
-- [ ] **5. Disagreement-flagging + evidence-confidence output**
+- [x] **5. Disagreement-flagging + evidence-confidence output** (implemented as part of step 4 — same function in practice; tests cover thin/moderate/strong mapping)
   Final step of the Stage 2 loop: one structured-output call that takes all
   gathered tool results + the resume/Stage 1 claims and produces
   `findings` (cross-referenced, source-attributed), `disagreements` (explicit
