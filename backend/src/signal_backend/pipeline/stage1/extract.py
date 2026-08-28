@@ -17,13 +17,23 @@ from signal_backend.services.llm import LLMClient, get_llm_client
 SYSTEM_PROMPT = """You are screening a candidate's resume against a job description's
 structured requirements.
 
-Extract key resume fields, then evaluate the resume against each requirement listed
-in the user message. For each requirement, note whether the resume meets it ("yes",
-"partial", "no") and cite the specific evidence in the resume text. Write a short,
-plain-language fit summary — do not produce a numeric score.
+First, extract the candidate's contact info from the resume itself (name, email,
+GitHub URL, personal website URL) — resumes typically list these in the header.
+Use null for anything not present; do not guess or invent a value.
+
+Then extract key resume fields, and evaluate the resume against each requirement
+listed in the user message. For each requirement, note whether the resume meets it
+("yes", "partial", "no") and cite the specific evidence in the resume text. Write a
+short, plain-language fit summary — do not produce a numeric score.
 
 Respond with JSON only, matching this schema:
 {
+  "contact_info": {
+    "name": str | null,
+    "email": str | null,
+    "github_url": str | null,
+    "website_url": str | null
+  },
   "extracted_fields": {
     "years_experience": number | null,
     "skills": [str],
@@ -36,6 +46,13 @@ Respond with JSON only, matching this schema:
   "fit_summary": str
 }
 """
+
+
+class ContactInfo(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    github_url: str | None = None
+    website_url: str | None = None
 
 
 class EmploymentEntry(BaseModel):
@@ -60,9 +77,18 @@ class RequirementMatch(BaseModel):
 
 
 class Stage1Response(BaseModel):
+    contact_info: ContactInfo
     extracted_fields: ExtractedFields
     requirement_matches: list[RequirementMatch]
     fit_summary: str
+
+
+def _with_scheme(url: str | None) -> str | None:
+    """Resumes often list URLs without a protocol (e.g. "github.com/jane")
+    — normalize so they render as clickable links rather than relative paths."""
+    if url and not url.startswith(("http://", "https://")):
+        return f"https://{url}"
+    return url
 
 
 def run_stage1(
@@ -81,6 +107,12 @@ def run_stage1(
     )
 
     candidate.extracted_fields = response.extracted_fields.model_dump()
+    # Manual form values (if provided) win; otherwise fall back to what the
+    # resume itself says — most candidates won't be typed in one at a time.
+    candidate.name = candidate.name or response.contact_info.name
+    candidate.email = candidate.email or response.contact_info.email
+    candidate.github_url = _with_scheme(candidate.github_url or response.contact_info.github_url)
+    candidate.website_url = _with_scheme(candidate.website_url or response.contact_info.website_url)
 
     return MatchResult(
         candidate_id=candidate.id,

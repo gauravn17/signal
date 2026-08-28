@@ -8,6 +8,25 @@ def test_list_job_descriptions(client):
     assert {"Backend Engineer", "Frontend Engineer"} <= titles
 
 
+def test_create_candidate_without_manual_name_uses_extracted_contact_info(client):
+    jd_response = client.post(
+        "/job-descriptions",
+        json={"title": "Backend Engineer", "raw_text": "We need a backend engineer with 5+ years Python."},
+    )
+    jd_id = jd_response.json()["id"]
+
+    candidate_response = client.post(
+        "/candidates",
+        data={"job_description_id": jd_id},  # no name/email/github_url/website_url
+        files={"resume": ("resume.txt", b"Extracted Name resume text.", "text/plain")},
+    )
+    assert candidate_response.status_code == 200
+    candidate = candidate_response.json()["candidate"]
+    assert candidate["name"] == "Extracted Name"
+    assert candidate["email"] == "extracted@example.com"
+    assert candidate["github_url"] == "https://github.com/extracted-user"
+
+
 def test_create_job_description_and_candidate(client, run_queued_jobs):
     jd_response = client.post(
         "/job-descriptions",

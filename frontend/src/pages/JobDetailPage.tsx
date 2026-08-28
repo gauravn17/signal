@@ -59,6 +59,12 @@ const EMPTY_FORM: UploadFormState = {
   websiteUrl: "",
 };
 
+interface UploadOutcome {
+  fileName: string;
+  ok: boolean;
+  message: string;
+}
+
 export default function JobDetailPage() {
   const { jdId } = useParams<{ jdId: string }>();
 
@@ -77,10 +83,15 @@ export default function JobDetailPage() {
   const [shortlistMessage, setShortlistMessage] = useState<string | null>(null);
 
   const [form, setForm] = useState<UploadFormState>(EMPTY_FORM);
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeFiles, setResumeFiles] = useState<File[]>([]);
   const [uploadSubmitting, setUploadSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [uploadOutcomes, setUploadOutcomes] = useState<UploadOutcome[]>([]);
+
+  // Manual name/email/github/website only make sense for a single resume —
+  // for a batch, every candidate's contact info is auto-extracted instead.
+  const isBatch = resumeFiles.length > 1;
 
   const loadJobDescription = useCallback(async () => {
     if (!jdId) return;
@@ -163,39 +174,51 @@ export default function JobDetailPage() {
   async function handleUploadSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!jdId) return;
-    if (!form.name.trim()) {
-      setUploadError("Name is required.");
-      return;
-    }
-    if (!resumeFile) {
-      setUploadError("A resume file is required.");
+    if (resumeFiles.length === 0) {
+      setUploadError("At least one resume file is required.");
       return;
     }
 
     setUploadSubmitting(true);
     setUploadError(null);
-    setUploadMessage(null);
-    try {
-      const formData = new FormData();
-      formData.append("job_description_id", jdId);
-      formData.append("name", form.name.trim());
-      if (form.email.trim()) formData.append("email", form.email.trim());
-      if (form.githubUrl.trim()) formData.append("github_url", form.githubUrl.trim());
-      if (form.websiteUrl.trim()) formData.append("website_url", form.websiteUrl.trim());
-      formData.append("resume", resumeFile);
+    setUploadOutcomes([]);
+    setUploadProgress({ done: 0, total: resumeFiles.length });
 
-      const result = await createCandidate(formData);
-      setUploadMessage(`Added ${result.candidate.name}. Stage 1 match complete.`);
-      setForm(EMPTY_FORM);
-      setResumeFile(null);
-      const fileInput = document.getElementById("resume-file-input") as HTMLInputElement | null;
-      if (fileInput) fileInput.value = "";
-      await loadCandidates();
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Failed to upload resume.");
-    } finally {
-      setUploadSubmitting(false);
+    const outcomes: UploadOutcome[] = [];
+    for (const file of resumeFiles) {
+      try {
+        const formData = new FormData();
+        formData.append("job_description_id", jdId);
+        // Manual overrides only apply to a single-file upload — for a batch,
+        // every candidate's name/email/links come from their own resume.
+        if (!isBatch) {
+          if (form.name.trim()) formData.append("name", form.name.trim());
+          if (form.email.trim()) formData.append("email", form.email.trim());
+          if (form.githubUrl.trim()) formData.append("github_url", form.githubUrl.trim());
+          if (form.websiteUrl.trim()) formData.append("website_url", form.websiteUrl.trim());
+        }
+        formData.append("resume", file);
+
+        const result = await createCandidate(formData);
+        outcomes.push({ fileName: file.name, ok: true, message: `Added ${result.candidate.name}.` });
+      } catch (err) {
+        outcomes.push({
+          fileName: file.name,
+          ok: false,
+          message: err instanceof Error ? err.message : "Upload failed.",
+        });
+      }
+      setUploadProgress({ done: outcomes.length, total: resumeFiles.length });
     }
+
+    setUploadOutcomes(outcomes);
+    setForm(EMPTY_FORM);
+    setResumeFiles([]);
+    const fileInput = document.getElementById("resume-file-input") as HTMLInputElement | null;
+    if (fileInput) fileInput.value = "";
+    setUploadSubmitting(false);
+    setUploadProgress(null);
+    await loadCandidates();
   }
 
   if (!jdId) {
@@ -263,70 +286,84 @@ export default function JobDetailPage() {
 
       {/* Resume upload */}
       <section className="rounded border border-gray-200 bg-white p-4 space-y-3">
-        <h2 className="text-lg font-medium text-gray-900">Upload resume</h2>
+        <h2 className="text-lg font-medium text-gray-900">Upload resumes</h2>
+        <p className="text-xs text-gray-500">
+          Select one or more resumes. Name, email, GitHub, and website are read straight off
+          each resume — you don't need to type them in.
+        </p>
         <form onSubmit={handleUploadSubmit} className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="candidate-name">
-                Name *
-              </label>
-              <input
-                id="candidate-name"
-                type="text"
-                required
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="candidate-email">
-                Email
-              </label>
-              <input
-                id="candidate-email"
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="candidate-github">
-                GitHub URL
-              </label>
-              <input
-                id="candidate-github"
-                type="url"
-                value={form.githubUrl}
-                onChange={(e) => setForm((f) => ({ ...f, githubUrl: e.target.value }))}
-                className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="candidate-website">
-                Website URL
-              </label>
-              <input
-                id="candidate-website"
-                type="url"
-                value={form.websiteUrl}
-                onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))}
-                className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="resume-file-input">
-              Resume file *
+              Resume file(s) *
             </label>
             <input
               id="resume-file-input"
               type="file"
+              multiple
               required
-              onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => setResumeFiles(Array.from(e.target.files ?? []))}
               className="block w-full text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-gray-200"
             />
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-600 mb-1">
+              Optional overrides{isBatch ? " (only apply to a single-file upload)" : ""}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1" htmlFor="candidate-name">
+                  Name
+                </label>
+                <input
+                  id="candidate-name"
+                  type="text"
+                  disabled={isBatch}
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1" htmlFor="candidate-email">
+                  Email
+                </label>
+                <input
+                  id="candidate-email"
+                  type="email"
+                  disabled={isBatch}
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1" htmlFor="candidate-github">
+                  GitHub URL
+                </label>
+                <input
+                  id="candidate-github"
+                  type="url"
+                  disabled={isBatch}
+                  value={form.githubUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, githubUrl: e.target.value }))}
+                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1" htmlFor="candidate-website">
+                  Website URL
+                </label>
+                <input
+                  id="candidate-website"
+                  type="url"
+                  disabled={isBatch}
+                  value={form.websiteUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))}
+                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+            </div>
           </div>
 
           {uploadError && (
@@ -334,18 +371,31 @@ export default function JobDetailPage() {
               {uploadError}
             </div>
           )}
-          {uploadMessage && (
-            <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700">
-              {uploadMessage}
+          {uploadOutcomes.length > 0 && (
+            <div className="space-y-1">
+              {uploadOutcomes.map((o, idx) => (
+                <div
+                  key={idx}
+                  className={`rounded border px-3 py-2 text-sm ${
+                    o.ok
+                      ? "border-green-300 bg-green-50 text-green-700"
+                      : "border-red-300 bg-red-50 text-red-700"
+                  }`}
+                >
+                  <span className="font-medium">{o.fileName}:</span> {o.message}
+                </div>
+              ))}
             </div>
           )}
 
           <button
             type="submit"
-            disabled={uploadSubmitting}
+            disabled={uploadSubmitting || resumeFiles.length === 0}
             className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {uploadSubmitting ? "Uploading & running Stage 1 match… (this can take a few seconds)" : "Upload resume"}
+            {uploadSubmitting
+              ? `Running Stage 1 match… (${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? resumeFiles.length})`
+              : `Upload ${resumeFiles.length || ""} resume${resumeFiles.length === 1 ? "" : "s"}`.trim()}
           </button>
         </form>
       </section>

@@ -33,13 +33,16 @@ class VerifyJobResponse(BaseModel):
 @router.post("", response_model=CandidateWithMatch)
 def create_candidate(
     job_description_id: UUID = Form(...),
-    name: str = Form(...),
+    name: str | None = Form(None),
     email: str | None = Form(None),
     github_url: str | None = Form(None),
     website_url: str | None = Form(None),
     resume: UploadFile = File(...),
     session: Session = Depends(get_session),
 ):
+    """name/email/github_url/website_url are optional overrides — Stage 1
+    extracts them from the resume itself when not provided, so uploading
+    many candidates doesn't require typing in contact info by hand."""
     jd = session.get(JobDescription, job_description_id)
     if jd is None:
         raise HTTPException(status_code=404, detail="Job description not found")
@@ -54,12 +57,11 @@ def create_candidate(
         website_url=website_url,
         resume_raw_text=resume_raw_text,
     )
-    session.add(candidate)
-    session.commit()
-    session.refresh(candidate)
 
     match_result = run_stage1(candidate, jd)
-    session.add(candidate)  # persist extracted_fields set by run_stage1
+    candidate.name = candidate.name or "Unnamed Candidate"
+
+    session.add(candidate)
     session.add(match_result)
     session.commit()
     session.refresh(candidate)

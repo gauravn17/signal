@@ -26,6 +26,12 @@ class FakeLLMClient:
         if response_model is stage1_extract.Stage1Response:
             return response_model.model_validate(
                 {
+                    "contact_info": {
+                        "name": "Extracted Name",
+                        "email": "extracted@example.com",
+                        "github_url": "https://github.com/extracted-user",
+                        "website_url": "https://extracted.example.com",
+                    },
                     "extracted_fields": {
                         "years_experience": 6,
                         "skills": ["Python", "FastAPI"],

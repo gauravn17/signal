@@ -9,7 +9,8 @@ from sqlmodel import Field, SQLModel
 class Candidate(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     job_description_id: UUID = Field(foreign_key="jobdescription.id")
-    name: str
+    # None until Stage 1 fills it from the resume, unless provided manually.
+    name: Optional[str] = None
     email: Optional[str] = None
     resume_raw_text: str
     github_url: Optional[str] = None
