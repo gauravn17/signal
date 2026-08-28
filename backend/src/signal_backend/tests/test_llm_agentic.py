@@ -19,16 +19,20 @@ def _tool_call(call_id, name, arguments):
     return SimpleNamespace(id=call_id, function=SimpleNamespace(name=name, arguments=json.dumps(arguments)))
 
 
+def _final_answer_completion(answer_dict):
+    return _completion(tool_calls=[_tool_call("final_1", "submit_final_answer", answer_dict)])
+
+
 def test_agentic_run_executes_tool_then_final_answer():
     calls = []
 
     def create(**kwargs):
         calls.append(kwargs)
-        if len(calls) == 1:
-            return _completion(tool_calls=[_tool_call("call_1", "check_github", {"username": "octocat"})])
-        if len(calls) == 2:
+        if kwargs.get("tool_choice") == "auto":
+            if len(calls) == 1:
+                return _completion(tool_calls=[_tool_call("call_1", "check_github", {"username": "octocat"})])
             return _completion(content=None, tool_calls=None)
-        return _completion(content=json.dumps({"answer": "done"}))
+        return _final_answer_completion({"answer": "done"})
 
     fake_openai = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
     client = GroqLLMClient(client=fake_openai)
@@ -51,6 +55,9 @@ def test_agentic_run_executes_tool_then_final_answer():
     assert executed == [("check_github", {"username": "octocat"})]
     assert result.answer == "done"
     assert len(calls) == 3
+    # Final call must declare a tool and force it, since some providers keep
+    # emitting structured output as a tool call after a tool-using conversation.
+    assert calls[-1]["tool_choice"] == {"type": "function", "function": {"name": "submit_final_answer"}}
 
 
 def test_agentic_run_stops_at_max_steps():
@@ -58,9 +65,9 @@ def test_agentic_run_stops_at_max_steps():
 
     def create(**kwargs):
         calls.append(kwargs)
-        if "tools" in kwargs:
+        if kwargs.get("tool_choice") == "auto":
             return _completion(tool_calls=[_tool_call(f"call_{len(calls)}", "check_github", {"username": "octocat"})])
-        return _completion(content=json.dumps({"answer": "forced"}))
+        return _final_answer_completion({"answer": "forced"})
 
     fake_openai = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
     client = GroqLLMClient(client=fake_openai)
