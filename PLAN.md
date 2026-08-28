@@ -83,12 +83,14 @@ considered done).
   network round-trip needed for the test, though local Redis via
   `docker-compose` is already available for manual testing).
 
-- [ ] **9. Manual end-to-end smoke test**
-  With a real `LLM_API_KEY` (Groq) and `GITHUB_TOKEN` in `.env`: create a JD,
-  upload 2-3 real resumes (including at least one with a real GitHub
-  username), run Stage 1, shortlist one, run Stage 2, and eyeball that the
-  findings/disagreements/confidence output makes sense. Not automated — a
-  manual check before calling Stage 2 "done."
+- [x] **9. Manual end-to-end smoke test** — done via curl against real Groq +
+  GitHub APIs (JD parse -> Stage 1 extract/match -> Stage 2 verify). Found
+  and fixed three real bugs in the process: a decommissioned Groq model name,
+  a macOS fork-safety crash in the RQ worker, and Stage 2's tool executor
+  blowing through token-per-minute limits by dumping raw GitHub API payloads
+  instead of trimmed fields. Deliberately tested with a mismatched real
+  GitHub profile and confirmed Stage 2 correctly flagged the resulting
+  disagreement rather than silently ignoring it.
 
 ## Explicitly deferred (not in this plan)
 

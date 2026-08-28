@@ -111,6 +111,60 @@ def test_run_stage2_falls_back_to_website_when_no_github():
     assert match_result.evidence_confidence == EvidenceConfidence.moderate
 
 
+def test_github_profile_tool_result_strips_bulky_fields():
+    """Regression test: a real GitHub API response nests owner/permissions/topics
+    per repo, which blew through Groq's tokens-per-minute limit on any
+    non-trivial profile. The tool result must only carry the fields the model
+    needs, not the raw API payload."""
+
+    verbose_repo = {
+        "name": "cool-project",
+        "description": "A cool project",
+        "language": "Python",
+        "fork": False,
+        "stargazers_count": 42,
+        "pushed_at": "2024-06-01T00:00:00Z",
+        "owner": {"login": "janedoe", "id": 123, "avatar_url": "https://...", "permissions": {"admin": True}},
+        "topics": ["python", "backend"],
+        "license": {"key": "mit", "name": "MIT License"},
+        "clone_url": "https://github.com/janedoe/cool-project.git",
+    }
+
+    def handler(request):
+        if request.url.path == "/users/janedoe":
+            return httpx.Response(
+                200,
+                json={
+                    "login": "janedoe",
+                    "public_repos": 12,
+                    "node_id": "abc123",
+                    "avatar_url": "https://...",
+                    "gravatar_id": "",
+                },
+            )
+        if request.url.path == "/users/janedoe/repos":
+            return httpx.Response(200, json=[verbose_repo])
+        return httpx.Response(404)
+
+    candidate, jd, stage1_result = _candidate_and_jd(github_url="https://github.com/janedoe")
+    llm_client = ScriptedLLMClient(
+        tool_calls_to_make=[("check_github_profile", {"username": "janedoe"})],
+        final_response={
+            "findings": [],
+            "disagreements": [],
+            "evidence_confidence": "strong",
+            "fit_summary": "ok",
+        },
+    )
+
+    run_stage2(candidate, jd, stage1_result, llm_client=llm_client, github_client=_github_client_with_handler(handler))
+
+    tool_result = llm_client.executed[0][2]
+    assert "cool-project" in tool_result
+    for bulky_field in ("permissions", "avatar_url", "node_id", "clone_url", "license", "topics"):
+        assert bulky_field not in tool_result
+
+
 def test_run_stage2_thin_evidence_not_penalized_in_summary():
     candidate, jd, stage1_result = _candidate_and_jd()  # no github_url, no website_url
 

@@ -12,8 +12,14 @@ Stage 2 verification runs on a background job queue (RQ). Start a worker
 alongside the API to process it:
 
 ```
-uv run rq worker stage2 --url redis://localhost:6379/0
+OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run rq worker stage2 --url redis://localhost:6379/0
 ```
+
+The `OBJC_DISABLE_INITIALIZE_FORK_SAFETY` env var works around a macOS-only
+crash (`+[NSMutableString initialize] may have been in progress in another
+thread when fork() was called`) — RQ's default worker forks a subprocess per
+job, and `truststore` (an `openai` client dependency that bridges to macOS's
+Objective-C Security framework for TLS) isn't fork-safe. Not needed on Linux.
 
 ## Tests
 

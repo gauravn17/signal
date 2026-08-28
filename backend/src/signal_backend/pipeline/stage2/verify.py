@@ -106,22 +106,61 @@ class Stage2Response(BaseModel):
     fit_summary: str
 
 
+def _summarize_profile(user: dict) -> dict:
+    return {
+        "login": user.get("login"),
+        "name": user.get("name"),
+        "bio": user.get("bio"),
+        "public_repos": user.get("public_repos"),
+        "followers": user.get("followers"),
+        "created_at": user.get("created_at"),
+    }
+
+
+def _summarize_repo(repo: dict) -> dict:
+    return {
+        "name": repo.get("name"),
+        "description": repo.get("description"),
+        "language": repo.get("language"),
+        "fork": repo.get("fork"),
+        "stargazers_count": repo.get("stargazers_count"),
+        "pushed_at": repo.get("pushed_at"),
+    }
+
+
+def _summarize_commit(commit: dict) -> dict:
+    commit_info = commit.get("commit", {})
+    return {
+        "sha": (commit.get("sha") or "")[:7],
+        "author": commit_info.get("author", {}).get("name"),
+        "date": commit_info.get("author", {}).get("date"),
+        "message": (commit_info.get("message") or "").splitlines()[0][:200],
+    }
+
+
 def _make_tool_executor(github_client: GitHubClient, website_http_client=None):
+    """Tool results are trimmed to the fields the model actually needs — raw
+    GitHub API responses are large enough (nested owner objects, permissions,
+    topics, etc. per repo) to blow through small-model token-per-minute
+    limits on anything but a trivial profile."""
+
     def tool_executor(name: str, args: dict) -> str:
         if name == "check_github_profile":
             user = github_client.get_user(args["username"])
             if user is None:
                 return "GitHub user not found."
             repos = github_client.get_user_repos(args["username"])
-            return json.dumps({"profile": user, "repos": repos[:20]})
+            return json.dumps(
+                {"profile": _summarize_profile(user), "repos": [_summarize_repo(r) for r in repos[:10]]}
+            )
         if name == "check_github_commits":
             commits = github_client.get_repo_commits(args["owner"], args["repo"], args.get("author"))
-            return json.dumps({"commits": commits[:20]})
+            return json.dumps({"commits": [_summarize_commit(c) for c in commits[:10]]})
         if name == "check_website":
             result = check_website(args["url"], http_client=website_http_client)
             if not result.is_live:
                 return f"Website unreachable (status={result.status_code})."
-            return (result.content or "")[:5000]
+            return (result.content or "")[:2000]
         return f"Unknown tool: {name}"
 
     return tool_executor
