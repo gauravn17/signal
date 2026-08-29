@@ -1,9 +1,24 @@
+from pathlib import Path
+
 import httpx
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from signal_backend.main import app
+
+BACKEND_ROOT = Path(__file__).resolve().parents[3]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def run_migrations():
+    """The app no longer auto-creates tables on startup (migrations are an
+    explicit, separate step in real deployments) — so tests apply them once
+    per session against the same local dev DB."""
+    alembic_cfg = Config(str(BACKEND_ROOT / "alembic.ini"))
+    command.upgrade(alembic_cfg, "head")
 from signal_backend.pipeline.stage1 import extract as stage1_extract
 from signal_backend.pipeline.stage1 import parse_jd as stage1_parse_jd
 from signal_backend.pipeline.stage2 import verify as stage2_verify
