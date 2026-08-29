@@ -1,3 +1,19 @@
+def test_stats_reflects_created_data(client):
+    before = client.get("/stats").json()
+
+    jd_response = client.post("/job-descriptions", json={"title": "Backend Engineer", "raw_text": "..."})
+    jd_id = jd_response.json()["id"]
+    client.post(
+        "/candidates",
+        data={"job_description_id": jd_id, "name": "Jane Doe"},
+        files={"resume": ("resume.txt", b"Jane Doe resume.", "text/plain")},
+    )
+
+    after = client.get("/stats").json()
+    assert after["job_description_count"] == before["job_description_count"] + 1
+    assert after["candidate_count"] == before["candidate_count"] + 1
+
+
 def test_list_job_descriptions(client):
     client.post("/job-descriptions", json={"title": "Backend Engineer", "raw_text": "..."})
     client.post("/job-descriptions", json={"title": "Frontend Engineer", "raw_text": "..."})

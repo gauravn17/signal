@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { getCandidate, getJobStatus, verifyCandidate } from "../api/client";
 import type { CandidateDetail, EvidenceConfidence, MatchResult } from "../api/types";
 import { Badge, Button, Card, ErrorBanner, Spinner } from "../components/ui";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -189,6 +190,8 @@ export default function CandidateDetailPage() {
   const [detail, setDetail] = useState<CandidateDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  useDocumentTitle(detail?.candidate.name ?? "Candidate");
 
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, Outlet } from "react-router-dom";
+import { Button } from "./ui";
 
 interface LayoutProps {
   children?: ReactNode;
@@ -16,7 +17,14 @@ export default function Layout({ children }: LayoutProps) {
             </span>
             <span className="text-lg font-semibold tracking-tight text-slate-900">Signal</span>
           </Link>
-          <span className="text-xs font-medium text-slate-400">Evidence-based candidate review</span>
+          <div className="flex items-center gap-4">
+            <span className="hidden text-xs font-medium text-slate-400 sm:inline">
+              Evidence-based candidate review
+            </span>
+            <Link to="/jobs/new">
+              <Button className="px-3 py-1.5 text-xs">New job description</Button>
+            </Link>
+          </div>
         </div>
       </header>
       <main className="flex-1">{children ?? <Outlet />}</main>

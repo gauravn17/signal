@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel
 
-from signal_backend.api import candidates, job_descriptions, jobs
+from signal_backend.api import candidates, job_descriptions, jobs, stats
 from signal_backend.db.session import engine
 from signal_backend import models  # noqa: F401  (registers tables with SQLModel metadata)
 
@@ -25,6 +25,7 @@ app.add_middleware(
 app.include_router(job_descriptions.router)
 app.include_router(candidates.router)
 app.include_router(jobs.router)
+app.include_router(stats.router)
 
 
 @app.get("/health")

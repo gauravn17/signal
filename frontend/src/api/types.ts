@@ -69,3 +69,9 @@ export interface JobStatusResponse {
   result: MatchResult | null;
   error: string | null;
 }
+
+export interface Stats {
+  job_description_count: number;
+  candidate_count: number;
+  stage2_verified_count: number;
+}

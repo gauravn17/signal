@@ -9,6 +9,7 @@ import {
 } from "../api/client";
 import type { Candidate, JobDescription, RequirementItem } from "../api/types";
 import { Badge, Button, Card, ErrorBanner, SuccessBanner, Spinner } from "../components/ui";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 const SOURCE_LABELS: Record<RequirementItem["source"], string> = {
   generic: "Generic",
@@ -61,6 +62,8 @@ export default function JobDetailPage() {
   const [jdLoading, setJdLoading] = useState(true);
   const [jdError, setJdError] = useState<string | null>(null);
   const [rawTextExpanded, setRawTextExpanded] = useState(false);
+
+  useDocumentTitle(jd?.title ?? "Job description");
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
@@ -221,7 +224,7 @@ export default function JobDetailPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-6 py-10">
       <Link to="/" className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
-        &larr; Back to job descriptions
+        &larr; Back to home
       </Link>
 
       {/* Job description */}

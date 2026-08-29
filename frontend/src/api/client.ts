@@ -4,6 +4,7 @@ import type {
   CandidateWithMatch,
   JobDescription,
   JobStatusResponse,
+  Stats,
   VerifyJobResponse,
 } from "./types";
 
@@ -84,4 +85,8 @@ export function verifyCandidate(id: string): Promise<VerifyJobResponse> {
 
 export function getJobStatus(jobId: string): Promise<JobStatusResponse> {
   return request<JobStatusResponse>(`/jobs/${jobId}`);
+}
+
+export function getStats(): Promise<Stats> {
+  return request<Stats>("/stats");
 }
