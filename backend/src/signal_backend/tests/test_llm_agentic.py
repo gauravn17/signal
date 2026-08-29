@@ -3,11 +3,29 @@ from types import SimpleNamespace
 
 from pydantic import BaseModel
 
-from signal_backend.services.llm import GroqLLMClient
+from signal_backend.services.llm import GroqLLMClient, _coerce_stringified_json
 
 
 class FakeResult(BaseModel):
     answer: str
+
+
+def test_coerce_stringified_json_unwraps_double_encoded_values():
+    """Regression test for a real Groq quirk: some list elements come back
+    as JSON-encoded strings instead of embedded objects."""
+    raw = {
+        "items": [
+            {"a": 1},
+            '{"b": 2}',  # double-encoded — must become {"b": 2}
+            "plain string",  # must stay untouched
+            "{not valid json",  # looks JSON-ish but isn't — must stay untouched
+        ]
+    }
+    result = _coerce_stringified_json(raw)
+    assert result["items"][0] == {"a": 1}
+    assert result["items"][1] == {"b": 2}
+    assert result["items"][2] == "plain string"
+    assert result["items"][3] == "{not valid json"
 
 
 def _completion(content=None, tool_calls=None):

@@ -3,11 +3,13 @@
 
 export type RequirementCategory = "must_have" | "nice_to_have";
 export type RequirementSource = "generic" | "hiring_team_free_text";
+export type RequirementType = "experience" | "skill" | "leadership" | "education" | "certification" | "other";
 
 export interface RequirementItem {
   text: string;
   category: RequirementCategory;
   source: RequirementSource;
+  requirement_type: RequirementType;
 }
 
 export interface JobDescription {
@@ -45,6 +47,9 @@ export interface MatchResult {
   evidence_confidence: EvidenceConfidence | null;
   findings: Record<string, unknown>[];
   disagreements: Record<string, unknown>[];
+  // Stage 1 only: {"strengths": string[], "gaps": string[]}. Null for Stage 2
+  // and for any MatchResult created before this field existed.
+  assessment_details: { strengths?: string[]; gaps?: string[] } | null;
   created_at: string;
 }
 

@@ -9,6 +9,24 @@ from signal_backend.config import settings
 T = TypeVar("T", bound=BaseModel)
 
 
+def _coerce_stringified_json(obj: Any) -> Any:
+    """Some models occasionally double-encode a nested object/array as a JSON
+    string instead of embedding it directly — observed empirically against
+    the real Groq model (not assumed), only inside list/dict values. Only
+    ever replaces a string with its parsed form when that string is itself
+    valid JSON, so a genuine plain-text string is never touched."""
+    if isinstance(obj, dict):
+        return {k: _coerce_stringified_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_coerce_stringified_json(v) for v in obj]
+    if isinstance(obj, str) and obj[:1] in "{[":
+        try:
+            return _coerce_stringified_json(json.loads(obj))
+        except (json.JSONDecodeError, ValueError):
+            return obj
+    return obj
+
+
 class LLMClient(Protocol):
     def structured_complete(self, system: str, user: str, response_model: type[T]) -> T: ...
 
@@ -39,7 +57,7 @@ class GroqLLMClient:
             response_format={"type": "json_object"},
         )
         content = completion.choices[0].message.content
-        return response_model.model_validate(json.loads(content))
+        return response_model.model_validate(_coerce_stringified_json(json.loads(content)))
 
     def agentic_run(
         self,

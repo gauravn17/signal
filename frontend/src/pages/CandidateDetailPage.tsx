@@ -13,7 +13,17 @@ const EVIDENCE_LABELS: Record<EvidenceConfidence, string> = {
   strong: "Evidence: strong",
 };
 
-const EVIDENCE_NOTES: Record<EvidenceConfidence, string> = {
+// evidence_confidence means something different per stage: at Stage 1 it's
+// how much specific, concrete detail the resume itself provides; at Stage 2
+// it's how much *external* corroboration (GitHub, site) was found. Same
+// field, same badge, stage-dependent meaning — the note must say which.
+const EVIDENCE_NOTES_STAGE1: Record<EvidenceConfidence, string> = {
+  thin: "Thin means the resume itself gives few specific, concrete details — not a quality judgment and not a worse candidate.",
+  moderate: "Moderate means the resume gives some specific, concrete detail alongside more generic claims.",
+  strong: "Strong means the resume gives specific, detailed, quantified claims throughout.",
+};
+
+const EVIDENCE_NOTES_STAGE2: Record<EvidenceConfidence, string> = {
   thin: "Thin means the assessment is based on the resume alone — it is not a quality judgment and not a worse candidate.",
   moderate: "Moderate means some outside evidence (e.g. GitHub, portfolio) was found alongside the resume.",
   strong: "Strong means multiple independent sources corroborated the resume's claims.",
@@ -85,6 +95,155 @@ function FindingsList({ findings }: { findings: Record<string, unknown>[] }) {
   );
 }
 
+// --- Stage 1 holistic per-requirement assessment rendering ---
+// Stage 1's findings are a completely different shape from Stage 2's flat
+// {text, source, status} — each is a full requirement with a nested,
+// type-specific assessment (experience/skill/leadership share one shape;
+// education and certification have their own). See pipeline/stage1/extract.py.
+
+type Stage1AssessmentLevel =
+  | "strong"
+  | "moderate"
+  | "weak"
+  | "not_demonstrated"
+  | "met"
+  | "partially_met"
+  | "not_met"
+  | "unclear";
+
+const STAGE1_LEVEL_TONE: Record<Stage1AssessmentLevel, "positive" | "info" | "caution" | "negative" | "neutral"> = {
+  strong: "positive",
+  met: "positive",
+  moderate: "info",
+  partially_met: "info",
+  weak: "caution",
+  unclear: "caution",
+  not_demonstrated: "neutral",
+  not_met: "negative",
+};
+
+const STAGE1_LEVEL_LABELS: Record<Stage1AssessmentLevel, string> = {
+  strong: "Strong",
+  moderate: "Moderate",
+  weak: "Weak",
+  not_demonstrated: "Not demonstrated",
+  met: "Met",
+  partially_met: "Partially met",
+  not_met: "Not met",
+  unclear: "Unclear",
+};
+
+function asStage1Level(value: unknown): Stage1AssessmentLevel {
+  const s = asString(value);
+  if (s && s in STAGE1_LEVEL_LABELS) return s as Stage1AssessmentLevel;
+  return "unclear";
+}
+
+// Covers every field across all requirement-type assessment shapes — each
+// requirement only populates the ones relevant to it, so this list is a
+// superset filtered down per-finding, not a fixed set every card shows.
+const DIMENSION_FIELDS: { key: string; label: string }[] = [
+  { key: "depth", label: "Depth" },
+  { key: "duration", label: "Duration" },
+  { key: "recency", label: "Recency" },
+  { key: "context", label: "Context" },
+  { key: "ownership", label: "Ownership" },
+  { key: "scale", label: "Scale" },
+  { key: "impact", label: "Impact" },
+  { key: "seniority", label: "Seniority" },
+  { key: "degree_level", label: "Degree" },
+  { key: "field_of_study", label: "Field of study" },
+  { key: "institution", label: "Institution" },
+  { key: "certification_name", label: "Certification" },
+  { key: "issuer", label: "Issuer" },
+  { key: "status_or_date", label: "Status/date" },
+  { key: "notes", label: "Notes" },
+];
+
+function Stage1RequirementCard({ finding }: { finding: Record<string, unknown> }) {
+  const requirementText = asString(finding.requirement_text) ?? "Unlabeled requirement";
+  const category = asString(finding.category);
+  const assessmentObj = (finding.assessment ?? {}) as Record<string, unknown>;
+  const level = asStage1Level(assessmentObj.assessment);
+  const evidence = Array.isArray(assessmentObj.evidence) ? (assessmentObj.evidence as Record<string, unknown>[]) : [];
+  const gaps = Array.isArray(assessmentObj.gaps) ? (assessmentObj.gaps as unknown[]).map(String) : [];
+  const dimensions = DIMENSION_FIELDS.map(({ key, label }) => ({ label, value: asString(assessmentObj[key]) })).filter(
+    (d) => d.value,
+  );
+
+  return (
+    <li className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="flex-1 text-sm font-medium text-slate-800">{requirementText}</p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {category && (
+            <Badge tone={category === "must_have" ? "primary" : "neutral"} className="text-[11px]">
+              {category === "must_have" ? "Must-have" : "Nice-to-have"}
+            </Badge>
+          )}
+          <Badge tone={STAGE1_LEVEL_TONE[level]} className="text-[11px]">
+            {STAGE1_LEVEL_LABELS[level]}
+          </Badge>
+        </div>
+      </div>
+
+      {dimensions.length > 0 && (
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+          {dimensions.map((d) => (
+            <div key={d.label} className="text-xs">
+              <dt className="inline font-medium text-slate-500">{d.label}: </dt>
+              <dd className="inline text-slate-700">{d.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {evidence.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {evidence.map((e, idx) => (
+            <li key={idx} className="border-l-2 border-slate-200 pl-2 text-xs italic text-slate-600">
+              &ldquo;{asString(e.excerpt) ?? ""}&rdquo;
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {gaps.length > 0 && (
+        <p className="mt-2 text-xs text-slate-500">
+          <span className="font-medium">Gap:</span> {gaps.join("; ")}
+        </p>
+      )}
+    </li>
+  );
+}
+
+function Stage1FindingsList({ findings }: { findings: Record<string, unknown>[] }) {
+  if (findings.length === 0) {
+    return <p className="text-sm italic text-slate-500">No requirement assessments recorded.</p>;
+  }
+  return (
+    <ul className="space-y-2">
+      {findings.map((finding, idx) => (
+        <Stage1RequirementCard key={idx} finding={finding} />
+      ))}
+    </ul>
+  );
+}
+
+function AssessmentSummaryList({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h4>
+      <ul className="mt-1 list-inside list-disc space-y-0.5 text-sm text-slate-700">
+        {items.map((item, idx) => (
+          <li key={idx}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function DisagreementsList({ disagreements }: { disagreements: Record<string, unknown>[] }) {
   if (disagreements.length === 0) {
     return null;
@@ -124,12 +283,14 @@ function DisagreementsList({ disagreements }: { disagreements: Record<string, un
 }
 
 function MatchResultCard({ result }: { result: MatchResult }) {
-  const stageLabel = result.stage === 1 ? "Stage 1 · Initial screen" : "Stage 2 · Verified";
+  const isStage1 = result.stage === 1;
+  const stageLabel = isStage1 ? "Stage 1 · Initial screen" : "Stage 2 · Verified";
+  const evidenceNotes = isStage1 ? EVIDENCE_NOTES_STAGE1 : EVIDENCE_NOTES_STAGE2;
 
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Badge tone={result.stage === 1 ? "neutral" : "primary"} className="px-3 py-1">
+        <Badge tone={isStage1 ? "neutral" : "primary"} className="px-3 py-1">
           {stageLabel}
         </Badge>
         {result.evidence_confidence && (
@@ -140,7 +301,7 @@ function MatchResultCard({ result }: { result: MatchResult }) {
       </div>
 
       {result.evidence_confidence && (
-        <p className="mt-2 text-xs text-slate-500">{EVIDENCE_NOTES[result.evidence_confidence]}</p>
+        <p className="mt-2 text-xs text-slate-500">{evidenceNotes[result.evidence_confidence]}</p>
       )}
 
       <div className="mt-4">
@@ -148,10 +309,23 @@ function MatchResultCard({ result }: { result: MatchResult }) {
         <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{result.fit_summary}</p>
       </div>
 
+      {isStage1 && result.assessment_details && (
+        <>
+          <AssessmentSummaryList title="Strengths" items={result.assessment_details.strengths ?? []} />
+          <AssessmentSummaryList title="Gaps" items={result.assessment_details.gaps ?? []} />
+        </>
+      )}
+
       <div className="mt-5">
-        <h3 className="text-sm font-semibold text-slate-700">Findings</h3>
+        <h3 className="text-sm font-semibold text-slate-700">
+          {isStage1 ? "Requirement assessments" : "Findings"}
+        </h3>
         <div className="mt-2">
-          <FindingsList findings={result.findings} />
+          {isStage1 ? (
+            <Stage1FindingsList findings={result.findings} />
+          ) : (
+            <FindingsList findings={result.findings} />
+          )}
         </div>
       </div>
 
