@@ -108,7 +108,9 @@ def test_verify_before_stage1_returns_400(client):
 
     with Session(engine, expire_on_commit=False) as session:
         jd = session.get(JobDescription, jd_id)
-        candidate = Candidate(job_description_id=jd.id, name="No Stage1 Yet", resume_raw_text="...")
+        candidate = Candidate(
+            organization_id=jd.organization_id, job_description_id=jd.id, name="No Stage1 Yet", resume_raw_text="..."
+        )
         session.add(candidate)
         session.commit()
         session.refresh(candidate)
@@ -145,6 +147,47 @@ def test_shortlist_runs_stage2_for_multiple_candidates(client, run_queued_jobs):
         status = client.get(f"/jobs/{job['job_id']}").json()
         assert status["status"] == "finished"
         assert status["result"]["stage"] == 2
+
+
+def test_data_is_isolated_between_organizations(client):
+    from sqlmodel import Session
+
+    from signal_backend.db.session import engine
+    from signal_backend.main import app
+    from signal_backend.models import Organization, User, UserRole
+    from signal_backend.services.auth import get_current_user
+
+    jd_response = client.post("/job-descriptions", json={"title": "Confidential Role", "raw_text": "..."})
+    jd_id = jd_response.json()["id"]
+    candidate_response = client.post(
+        "/candidates",
+        data={"job_description_id": jd_id, "name": "Jane Doe"},
+        files={"resume": ("resume.txt", b"Jane Doe resume text.", "text/plain")},
+    )
+    candidate_id = candidate_response.json()["candidate"]["id"]
+
+    with Session(engine, expire_on_commit=False) as session:
+        other_org = Organization(name="Other Org")
+        session.add(other_org)
+        session.commit()
+        session.refresh(other_org)
+        other_user = User(
+            organization_id=other_org.id,
+            email="other@example.com",
+            role=UserRole.admin,
+            external_auth_id="other-external-id",
+        )
+        session.add(other_user)
+        session.commit()
+        session.refresh(other_user)
+
+    app.dependency_overrides[get_current_user] = lambda: other_user
+
+    assert client.get(f"/job-descriptions/{jd_id}").status_code == 404
+    assert client.get(f"/candidates/{candidate_id}").status_code == 404
+    assert candidate_id not in [c["id"] for c in client.get("/candidates", params={"job_description_id": jd_id}).json()]
+    assert "Confidential Role" not in {jd["title"] for jd in client.get("/job-descriptions").json()}
+    assert client.get("/stats").json()["job_description_count"] == 0
 
 
 def test_shortlist_rejects_candidate_from_other_jd(client):

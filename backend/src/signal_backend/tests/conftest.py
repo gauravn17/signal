@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -6,8 +7,16 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
+from sqlmodel import Session
 
+from signal_backend.db.session import engine
 from signal_backend.main import app
+from signal_backend.models import Organization, User, UserRole
+from signal_backend.pipeline.stage1 import extract as stage1_extract
+from signal_backend.pipeline.stage1 import parse_jd as stage1_parse_jd
+from signal_backend.pipeline.stage2 import verify as stage2_verify
+from signal_backend.services.auth import get_current_user
+from signal_backend.services.github import GitHubClient
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
 
@@ -19,10 +28,6 @@ def run_migrations():
     per session against the same local dev DB."""
     alembic_cfg = Config(str(BACKEND_ROOT / "alembic.ini"))
     command.upgrade(alembic_cfg, "head")
-from signal_backend.pipeline.stage1 import extract as stage1_extract
-from signal_backend.pipeline.stage1 import parse_jd as stage1_parse_jd
-from signal_backend.pipeline.stage2 import verify as stage2_verify
-from signal_backend.services.github import GitHubClient
 
 
 class FakeLLMClient:
@@ -125,6 +130,36 @@ def run_queued_jobs():
 
 
 @pytest.fixture
-def client(fake_llm_client, fake_github_client):
+def test_organization() -> Organization:
+    with Session(engine, expire_on_commit=False) as session:
+        org = Organization(name="Test Org")
+        session.add(org)
+        session.commit()
+        session.refresh(org)
+        return org
+
+
+@pytest.fixture
+def test_user(test_organization: Organization) -> User:
+    # Real Postgres, not per-test transactions — email/external_auth_id are
+    # unique-constrained, so every test that uses `client` needs its own.
+    unique = uuid4()
+    with Session(engine, expire_on_commit=False) as session:
+        user = User(
+            organization_id=test_organization.id,
+            email=f"test-{unique}@example.com",
+            role=UserRole.admin,
+            external_auth_id=f"test-external-id-{unique}",
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+
+
+@pytest.fixture
+def client(fake_llm_client, fake_github_client, test_user):
+    app.dependency_overrides[get_current_user] = lambda: test_user
     with TestClient(app) as c:
         yield c
+    app.dependency_overrides.clear()

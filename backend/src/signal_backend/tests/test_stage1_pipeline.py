@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from signal_backend.models import Candidate, JobDescription
 from signal_backend.pipeline.stage1.extract import _with_scheme, run_stage1
 from signal_backend.pipeline.stage1.parse_jd import parse_job_description
@@ -17,8 +19,12 @@ def test_parse_job_description(fake_llm_client):
 
 
 def test_run_stage1(fake_llm_client):
-    jd = JobDescription(title="Backend Engineer", raw_text="...", requirements=[{"text": "5+ years Python"}])
+    org_id = uuid4()
+    jd = JobDescription(
+        organization_id=org_id, title="Backend Engineer", raw_text="...", requirements=[{"text": "5+ years Python"}]
+    )
     candidate = Candidate(
+        organization_id=org_id,
         job_description_id=jd.id,
         name="Jane Doe",
         resume_raw_text="Jane Doe, 6 years as a Python engineer at Acme.",
@@ -30,11 +36,16 @@ def test_run_stage1(fake_llm_client):
     assert match_result.fit_summary == "Strong match on core requirements."
     assert match_result.findings[0]["met"] == "yes"
     assert candidate.name == "Jane Doe"  # manually-provided name wins over extraction
+    assert match_result.organization_id == org_id
 
 
 def test_run_stage1_fills_in_contact_info_when_not_provided(fake_llm_client):
-    jd = JobDescription(title="Backend Engineer", raw_text="...", requirements=[{"text": "5+ years Python"}])
+    org_id = uuid4()
+    jd = JobDescription(
+        organization_id=org_id, title="Backend Engineer", raw_text="...", requirements=[{"text": "5+ years Python"}]
+    )
     candidate = Candidate(
+        organization_id=org_id,
         job_description_id=jd.id,
         resume_raw_text="Extracted Name, 6 years as a Python engineer at Acme. github.com/extracted-user",
     )

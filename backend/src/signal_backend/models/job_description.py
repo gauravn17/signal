@@ -14,6 +14,7 @@ class RequirementCategory(str, Enum):
 
 class JobDescription(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    organization_id: UUID = Field(foreign_key="organization.id", index=True)
     title: str
     raw_text: str
     # Parsed structured requirements, each: {text, category, source: "generic" | "hiring_team_free_text"}

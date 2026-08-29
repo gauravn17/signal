@@ -115,6 +115,7 @@ def run_stage1(
     candidate.website_url = _with_scheme(candidate.website_url or response.contact_info.website_url)
 
     return MatchResult(
+        organization_id=candidate.organization_id,
         candidate_id=candidate.id,
         job_description_id=job_description.id,
         stage=PipelineStage.stage1_bulk,

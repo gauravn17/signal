@@ -210,6 +210,7 @@ def run_stage2(
     )
 
     return MatchResult(
+        organization_id=candidate.organization_id,
         candidate_id=candidate.id,
         job_description_id=job_description.id,
         stage=PipelineStage.stage2_verification,

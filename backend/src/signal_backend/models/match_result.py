@@ -27,6 +27,7 @@ class MatchResult(SQLModel, table=True):
     """
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    organization_id: UUID = Field(foreign_key="organization.id", index=True)
     candidate_id: UUID = Field(foreign_key="candidate.id")
     job_description_id: UUID = Field(foreign_key="jobdescription.id")
     stage: PipelineStage

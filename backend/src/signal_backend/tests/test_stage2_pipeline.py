@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import httpx
 
 from signal_backend.models import Candidate, EvidenceConfidence, JobDescription, MatchResult, PipelineStage
@@ -33,12 +35,21 @@ def _website_client_with_handler(handler) -> httpx.Client:
 
 
 def _candidate_and_jd(**candidate_kwargs):
-    jd = JobDescription(title="Backend Engineer", raw_text="...", requirements=[])
+    org_id = uuid4()
+    jd = JobDescription(organization_id=org_id, title="Backend Engineer", raw_text="...", requirements=[])
     candidate = Candidate(
-        job_description_id=jd.id, name="Jane Doe", resume_raw_text="Jane Doe resume text", **candidate_kwargs
+        organization_id=org_id,
+        job_description_id=jd.id,
+        name="Jane Doe",
+        resume_raw_text="Jane Doe resume text",
+        **candidate_kwargs,
     )
     stage1_result = MatchResult(
-        candidate_id=candidate.id, job_description_id=jd.id, stage=PipelineStage.stage1_bulk, fit_summary="ok"
+        organization_id=org_id,
+        candidate_id=candidate.id,
+        job_description_id=jd.id,
+        stage=PipelineStage.stage1_bulk,
+        fit_summary="ok",
     )
     return candidate, jd, stage1_result
 
