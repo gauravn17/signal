@@ -31,11 +31,24 @@ tools available. Call at most a few tools — do not over-investigate.
 
 When you're done investigating, respond with JSON only, matching this schema:
 {
-  "findings": [{"text": str, "source": "resume" | "github" | "website", "supports_or_contradicts": "supports" | "contradicts" | "neutral"}],
+  "findings": [{"text": str, "source": "resume" | "github" | "website", "status": "supported" | "contradicted" | "no_evidence_found" | "not_investigated"}],
   "disagreements": [{"topic": str, "resume_claim": str, "evidence_found": str}],
   "evidence_confidence": "thin" | "moderate" | "strong",
   "fit_summary": str
 }
+
+Set each finding's status precisely — "no evidence" and "contradicted" are NOT the
+same thing, and conflating them is a real mistake:
+- "supported": external evidence corroborates the claim.
+- "contradicted": you found evidence that actively conflicts with the claim (e.g. a
+  claimed employment period overlaps with a full-time GitHub-visible project
+  elsewhere). This is the one status that should prompt human review.
+- "no_evidence_found": you had a source to check (GitHub/website) but it didn't
+  confirm or deny this specific claim — absence of proof, not proof of absence.
+- "not_investigated": no external source existed to check this claim against at all
+  (e.g. no GitHub or website was provided/reachable). This is not suspicious.
+Never mark something "contradicted" just because you couldn't verify it — use
+"no_evidence_found" or "not_investigated" for that.
 
 evidence_confidence reflects how much external corroboration you found, not fit:
 "thin" = resume-only, no GitHub/site evidence available or reachable; "moderate" =
@@ -90,7 +103,7 @@ TOOLS = [
 class FindingItem(BaseModel):
     text: str
     source: Literal["resume", "github", "website"]
-    supports_or_contradicts: Literal["supports", "contradicts", "neutral"]
+    status: Literal["supported", "contradicted", "no_evidence_found", "not_investigated"]
 
 
 class DisagreementItem(BaseModel):

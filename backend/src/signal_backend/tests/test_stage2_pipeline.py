@@ -60,7 +60,7 @@ def test_run_stage2_calls_github_profile_tool_and_maps_result():
                 {
                     "text": "GitHub shows active repos matching claimed skills",
                     "source": "github",
-                    "supports_or_contradicts": "supports",
+                    "status": "supported",
                 }
             ],
             "disagreements": [],
@@ -90,7 +90,7 @@ def test_run_stage2_falls_back_to_website_when_no_github():
     llm_client = ScriptedLLMClient(
         tool_calls_to_make=[("check_website", {"url": "https://janedoe.dev"})],
         final_response={
-            "findings": [{"text": "Personal site is live and matches resume framing", "source": "website", "supports_or_contradicts": "supports"}],
+            "findings": [{"text": "Personal site is live and matches resume framing", "source": "website", "status": "supported"}],
             "disagreements": [],
             "evidence_confidence": "moderate",
             "fit_summary": "Reasonable corroboration via personal site.",
@@ -163,6 +163,57 @@ def test_github_profile_tool_result_strips_bulky_fields():
     assert "cool-project" in tool_result
     for bulky_field in ("permissions", "avatar_url", "node_id", "clone_url", "license", "topics"):
         assert bulky_field not in tool_result
+
+
+def test_run_stage2_distinguishes_no_evidence_from_contradicted():
+    """The whole point of the status field: "we didn't find anything" and
+    "we found something that conflicts" must be distinguishable, not both
+    collapsed into a generic non-support status."""
+    candidate, jd, stage1_result = _candidate_and_jd(github_url="https://github.com/janedoe")
+
+    llm_client = ScriptedLLMClient(
+        tool_calls_to_make=[("check_github_profile", {"username": "janedoe"})],
+        final_response={
+            "findings": [
+                {
+                    "text": "Claimed 5 years at Acme Corp (2019-2024)",
+                    "source": "resume",
+                    "status": "contradicted",
+                },
+                {
+                    "text": "Claimed a specific published research paper",
+                    "source": "github",
+                    "status": "no_evidence_found",
+                },
+                {
+                    "text": "Claimed a personal blog with technical writeups",
+                    "source": "website",
+                    "status": "not_investigated",
+                },
+            ],
+            "disagreements": [
+                {
+                    "topic": "Employment dates",
+                    "resume_claim": "5 years at Acme Corp (2019-2024)",
+                    "evidence_found": "GitHub shows full-time open-source maintainer activity at a different project throughout 2019-2024",
+                }
+            ],
+            "evidence_confidence": "moderate",
+            "fit_summary": "Mixed evidence — one claim actively conflicts with GitHub activity.",
+        },
+    )
+
+    match_result = run_stage2(
+        candidate,
+        jd,
+        stage1_result,
+        llm_client=llm_client,
+        github_client=_github_client_with_handler(lambda r: httpx.Response(404)),
+    )
+
+    statuses = {f["status"] for f in match_result.findings}
+    assert statuses == {"contradicted", "no_evidence_found", "not_investigated"}
+    assert len(match_result.disagreements) == 1
 
 
 def test_run_stage2_thin_evidence_not_penalized_in_summary():

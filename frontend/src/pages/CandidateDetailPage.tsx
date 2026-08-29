@@ -27,26 +27,32 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-type FindingStance = "supports" | "contradicts" | "neutral";
+// Four distinct states, not three — "no evidence either way" and "actively
+// contradicted" must never collapse into one bucket. See CLAUDE.md: absence
+// of proof is not proof of absence, and conflating the two misleads a
+// hiring manager into treating a thin-evidence candidate as suspicious.
+type FindingStatus = "supported" | "contradicted" | "no_evidence_found" | "not_investigated";
 
-function findingStance(value: unknown): FindingStance {
+function findingStatus(value: unknown): FindingStatus {
   const s = asString(value)?.toLowerCase();
-  if (s === "supports" || s === "contradicts" || s === "neutral") {
+  if (s === "supported" || s === "contradicted" || s === "no_evidence_found" || s === "not_investigated") {
     return s;
   }
-  return "neutral";
+  return "not_investigated";
 }
 
-const STANCE_STYLES: Record<FindingStance, string> = {
-  supports: "border-emerald-300 bg-emerald-50 text-emerald-800",
-  contradicts: "border-rose-300 bg-rose-50 text-rose-800",
-  neutral: "border-gray-300 bg-gray-50 text-gray-700",
+const STATUS_STYLES: Record<FindingStatus, string> = {
+  supported: "border-emerald-300 bg-emerald-50 text-emerald-800",
+  contradicted: "border-rose-300 bg-rose-50 text-rose-800",
+  no_evidence_found: "border-gray-300 bg-gray-50 text-gray-700",
+  not_investigated: "border-gray-200 bg-white text-gray-500",
 };
 
-const STANCE_LABELS: Record<FindingStance, string> = {
-  supports: "Supports",
-  contradicts: "Contradicts",
-  neutral: "Neutral",
+const STATUS_LABELS: Record<FindingStatus, string> = {
+  supported: "Supported",
+  contradicted: "Contradicted — review",
+  no_evidence_found: "No evidence found",
+  not_investigated: "Not investigated",
 };
 
 function FindingsList({ findings }: { findings: Record<string, unknown>[] }) {
@@ -59,17 +65,17 @@ function FindingsList({ findings }: { findings: Record<string, unknown>[] }) {
       {findings.map((finding, idx) => {
         const text = asString(finding.text) ?? asString(finding.finding) ?? JSON.stringify(finding);
         const source = asString(finding.source);
-        const stance = findingStance(finding.stance ?? finding.relation ?? finding.type);
+        const status = findingStatus(finding.status);
 
         return (
           <li
             key={idx}
-            className={`rounded-md border px-3 py-2 text-sm ${STANCE_STYLES[stance]}`}
+            className={`rounded-md border px-3 py-2 text-sm ${STATUS_STYLES[status]}`}
           >
             <div className="flex items-start justify-between gap-3">
               <p className="flex-1">{text}</p>
               <span className="shrink-0 rounded-full border border-current/30 bg-white/60 px-2 py-0.5 text-xs font-medium">
-                {STANCE_LABELS[stance]}
+                {STATUS_LABELS[status]}
               </span>
             </div>
             {source && <p className="mt-1 text-xs opacity-75">Source: {source}</p>}
