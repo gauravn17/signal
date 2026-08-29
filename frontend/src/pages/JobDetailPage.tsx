@@ -8,37 +8,26 @@ import {
   shortlistCandidates,
 } from "../api/client";
 import type { Candidate, JobDescription, RequirementItem } from "../api/types";
+import { Badge, Button, Card, ErrorBanner, SuccessBanner, Spinner } from "../components/ui";
 
 const SOURCE_LABELS: Record<RequirementItem["source"], string> = {
   generic: "Generic",
   hiring_team_free_text: "Hiring team",
 };
 
-function RequirementBadge({ source }: { source: RequirementItem["source"] }) {
-  const isHiringTeam = source === "hiring_team_free_text";
-  return (
-    <span
-      className={`ml-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-        isHiringTeam
-          ? "bg-purple-100 text-purple-700"
-          : "bg-gray-100 text-gray-600"
-      }`}
-    >
-      {SOURCE_LABELS[source]}
-    </span>
-  );
-}
-
 function RequirementList({ items }: { items: RequirementItem[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-gray-400 italic">None listed</p>;
+    return <p className="text-sm italic text-slate-400">None listed</p>;
   }
   return (
-    <ul className="space-y-1.5">
+    <ul className="space-y-2">
       {items.map((item, idx) => (
-        <li key={idx} className="text-sm text-gray-800 flex items-start flex-wrap">
-          <span>{item.text}</span>
-          <RequirementBadge source={item.source} />
+        <li key={idx} className="flex flex-wrap items-start gap-2 text-sm text-slate-700">
+          <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+          <span className="flex-1">{item.text}</span>
+          <Badge tone={item.source === "hiring_team_free_text" ? "primary" : "neutral"}>
+            {SOURCE_LABELS[item.source]}
+          </Badge>
         </li>
       ))}
     </ul>
@@ -222,78 +211,80 @@ export default function JobDetailPage() {
   }
 
   if (!jdId) {
-    return <div className="p-6 text-red-600">Missing job description id in URL.</div>;
+    return (
+      <div className="mx-auto max-w-5xl px-6 py-10">
+        <ErrorBanner>Missing job description id in URL.</ErrorBanner>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-8">
-      <div>
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
-          &larr; Back to job descriptions
-        </Link>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-8 px-6 py-10">
+      <Link to="/" className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+        &larr; Back to job descriptions
+      </Link>
 
       {/* Job description */}
       <section className="space-y-4">
-        {jdLoading && <p className="text-sm text-gray-500">Loading job description…</p>}
-        {jdError && (
-          <div className="rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {jdError}
+        {jdLoading && (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Spinner className="h-4 w-4" /> Loading job description…
           </div>
         )}
+        {jdError && <ErrorBanner>{jdError}</ErrorBanner>}
         {jd && (
           <>
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">{jd.title}</h1>
-              <p className="text-xs text-gray-400 mt-1">
-                Created {new Date(jd.created_at).toLocaleString()}
-              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">{jd.title}</h1>
+              <p className="mt-1 text-xs text-slate-400">Created {new Date(jd.created_at).toLocaleString()}</p>
             </div>
 
-            <div className="rounded border border-gray-200 bg-white p-4">
+            <Card className="p-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-gray-700">Raw text</h2>
+                <h2 className="text-sm font-semibold text-slate-700">Raw text</h2>
                 <button
                   type="button"
                   onClick={() => setRawTextExpanded((v) => !v)}
-                  className="text-xs text-blue-600 hover:underline"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
                 >
                   {rawTextExpanded ? "Collapse" : "Expand"}
                 </button>
               </div>
               <p
-                className={`mt-2 whitespace-pre-wrap text-sm text-gray-700 ${
+                className={`mt-2 whitespace-pre-wrap text-sm text-slate-600 ${
                   rawTextExpanded ? "" : "line-clamp-3 overflow-hidden"
                 }`}
               >
                 {jd.raw_text}
               </p>
-            </div>
+            </Card>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded border border-gray-200 bg-white p-4">
-                <h2 className="text-sm font-medium text-gray-700 mb-2">Must-have requirements</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Card className="p-5">
+                <h2 className="mb-3 text-sm font-semibold text-slate-700">Must-have requirements</h2>
                 <RequirementList items={mustHave} />
-              </div>
-              <div className="rounded border border-gray-200 bg-white p-4">
-                <h2 className="text-sm font-medium text-gray-700 mb-2">Nice-to-have requirements</h2>
+              </Card>
+              <Card className="p-5">
+                <h2 className="mb-3 text-sm font-semibold text-slate-700">Nice-to-have requirements</h2>
                 <RequirementList items={niceToHave} />
-              </div>
+              </Card>
             </div>
           </>
         )}
       </section>
 
       {/* Resume upload */}
-      <section className="rounded border border-gray-200 bg-white p-4 space-y-3">
-        <h2 className="text-lg font-medium text-gray-900">Upload resumes</h2>
-        <p className="text-xs text-gray-500">
-          Select one or more resumes. Name, email, GitHub, and website are read straight off
-          each resume — you don't need to type them in.
-        </p>
-        <form onSubmit={handleUploadSubmit} className="space-y-3">
+      <Card className="space-y-4 p-6">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Upload resumes</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Select one or more resumes. Name, email, GitHub, and website are read straight off each
+            resume — you don't need to type them in.
+          </p>
+        </div>
+        <form onSubmit={handleUploadSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="resume-file-input">
+            <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="resume-file-input">
               Resume file(s) *
             </label>
             <input
@@ -302,17 +293,17 @@ export default function JobDetailPage() {
               multiple
               required
               onChange={(e) => setResumeFiles(Array.from(e.target.files ?? []))}
-              className="block w-full text-sm text-gray-600 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-gray-200"
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
             />
           </div>
 
           <div>
-            <p className="text-xs font-medium text-gray-600 mb-1">
+            <p className="mb-2 text-xs font-medium text-slate-600">
               Optional overrides{isBatch ? " (only apply to a single-file upload)" : ""}
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs text-gray-500 mb-1" htmlFor="candidate-name">
+                <label className="mb-1 block text-xs text-slate-500" htmlFor="candidate-name">
                   Name
                 </label>
                 <input
@@ -321,11 +312,11 @@ export default function JobDetailPage() {
                   disabled={isBatch}
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1" htmlFor="candidate-email">
+                <label className="mb-1 block text-xs text-slate-500" htmlFor="candidate-email">
                   Email
                 </label>
                 <input
@@ -334,11 +325,11 @@ export default function JobDetailPage() {
                   disabled={isBatch}
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1" htmlFor="candidate-github">
+                <label className="mb-1 block text-xs text-slate-500" htmlFor="candidate-github">
                   GitHub URL
                 </label>
                 <input
@@ -347,11 +338,11 @@ export default function JobDetailPage() {
                   disabled={isBatch}
                   value={form.githubUrl}
                   onChange={(e) => setForm((f) => ({ ...f, githubUrl: e.target.value }))}
-                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1" htmlFor="candidate-website">
+                <label className="mb-1 block text-xs text-slate-500" htmlFor="candidate-website">
                   Website URL
                 </label>
                 <input
@@ -360,130 +351,124 @@ export default function JobDetailPage() {
                   disabled={isBatch}
                   value={form.websiteUrl}
                   onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))}
-                  className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400"
                 />
               </div>
             </div>
           </div>
 
-          {uploadError && (
-            <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {uploadError}
-            </div>
-          )}
+          {uploadError && <ErrorBanner>{uploadError}</ErrorBanner>}
           {uploadOutcomes.length > 0 && (
-            <div className="space-y-1">
-              {uploadOutcomes.map((o, idx) => (
-                <div
-                  key={idx}
-                  className={`rounded border px-3 py-2 text-sm ${
-                    o.ok
-                      ? "border-green-300 bg-green-50 text-green-700"
-                      : "border-red-300 bg-red-50 text-red-700"
-                  }`}
-                >
-                  <span className="font-medium">{o.fileName}:</span> {o.message}
-                </div>
-              ))}
+            <div className="space-y-1.5">
+              {uploadOutcomes.map((o, idx) =>
+                o.ok ? (
+                  <SuccessBanner key={idx}>
+                    <span className="font-medium">{o.fileName}:</span> {o.message}
+                  </SuccessBanner>
+                ) : (
+                  <ErrorBanner key={idx}>
+                    <span className="font-medium">{o.fileName}:</span> {o.message}
+                  </ErrorBanner>
+                ),
+              )}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={uploadSubmitting || resumeFiles.length === 0}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <Button type="submit" disabled={uploadSubmitting || resumeFiles.length === 0}>
+            {uploadSubmitting && <Spinner className="h-4 w-4" />}
             {uploadSubmitting
               ? `Running Stage 1 match… (${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? resumeFiles.length})`
               : `Upload ${resumeFiles.length || ""} resume${resumeFiles.length === 1 ? "" : "s"}`.trim()}
-          </button>
+          </Button>
         </form>
-      </section>
+      </Card>
 
       {/* Candidates table */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium text-gray-900">Candidates</h2>
-          <button
-            type="button"
+          <h2 className="text-base font-semibold text-slate-900">Candidates</h2>
+          <Button
+            variant="secondary"
             onClick={handleVerifySelected}
             disabled={selectedIds.size === 0 || shortlistSubmitting}
-            className="rounded bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
           >
+            {shortlistSubmitting && <Spinner className="h-4 w-4" />}
             {shortlistSubmitting
               ? "Queuing…"
               : `Verify Selected${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
-          </button>
+          </Button>
         </div>
 
-        {shortlistError && (
-          <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {shortlistError}
-          </div>
-        )}
-        {shortlistMessage && (
-          <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700">
-            {shortlistMessage}
-          </div>
-        )}
+        {shortlistError && <ErrorBanner>{shortlistError}</ErrorBanner>}
+        {shortlistMessage && <SuccessBanner>{shortlistMessage}</SuccessBanner>}
 
-        {candidatesLoading && <p className="text-sm text-gray-500">Loading candidates…</p>}
-        {candidatesError && (
-          <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {candidatesError}
+        {candidatesLoading && (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Spinner className="h-4 w-4" /> Loading candidates…
           </div>
         )}
+        {candidatesError && <ErrorBanner>{candidatesError}</ErrorBanner>}
 
         {!candidatesLoading && !candidatesError && candidates.length === 0 && (
-          <p className="text-sm text-gray-400 italic">No candidates yet for this job.</p>
+          <Card className="px-6 py-10 text-center">
+            <p className="text-sm text-slate-500">No candidates yet for this job. Upload resumes above.</p>
+          </Card>
         )}
 
         {!candidatesLoading && !candidatesError && candidates.length > 0 && (
-          <div className="overflow-x-auto rounded border border-gray-200 bg-white">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+          <Card className="overflow-hidden">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th className="w-10 px-3 py-2 text-left">
+                  <th className="w-10 px-4 py-3 text-left">
                     <input
                       type="checkbox"
                       checked={selectedIds.size === candidates.length && candidates.length > 0}
                       onChange={toggleSelectAll}
                       aria-label="Select all candidates"
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     />
                   </th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">Name</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">Email</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">Links</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-600">Added</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Name
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Links
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Added
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {candidates.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2">
+                  <tr key={c.id} className="transition hover:bg-slate-50">
+                    <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(c.id)}
                         onChange={() => toggleSelected(c.id)}
                         aria-label={`Select ${c.name}`}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                       />
                     </td>
-                    <td className="px-3 py-2">
-                      <Link
-                        to={`/candidates/${c.id}`}
-                        className="font-medium text-blue-600 hover:underline"
-                      >
+                    <td className="px-4 py-3">
+                      <Link to={`/candidates/${c.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                         {c.name}
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-gray-700">{c.email ?? "—"}</td>
-                    <td className="px-3 py-2 space-x-2">
+                    <td className="px-4 py-3 text-slate-600">{c.email ?? "—"}</td>
+                    <td className="space-x-3 px-4 py-3">
                       {c.github_url && (
                         <a
                           href={c.github_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-blue-600 hover:underline"
+                          className="text-indigo-600 hover:text-indigo-800"
                         >
                           GitHub
                         </a>
@@ -493,21 +478,19 @@ export default function JobDetailPage() {
                           href={c.website_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-blue-600 hover:underline"
+                          className="text-indigo-600 hover:text-indigo-800"
                         >
                           Website
                         </a>
                       )}
-                      {!c.github_url && !c.website_url && <span className="text-gray-300">—</span>}
+                      {!c.github_url && !c.website_url && <span className="text-slate-300">—</span>}
                     </td>
-                    <td className="px-3 py-2 text-gray-500">
-                      {new Date(c.created_at).toLocaleDateString()}
-                    </td>
+                    <td className="px-4 py-3 text-slate-400">{new Date(c.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </Card>
         )}
       </section>
     </div>

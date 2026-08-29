@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createJobDescription, listJobDescriptions } from "../api/client";
 import type { JobDescription } from "../api/types";
+import { Badge, Button, Card, ErrorBanner, PageHeader, Spinner } from "../components/ui";
 
 export default function JobDescriptionsPage() {
   const navigate = useNavigate();
@@ -64,32 +65,24 @@ export default function JobDescriptionsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-2xl font-semibold text-gray-900">Job Descriptions</h1>
+    <div className="mx-auto max-w-5xl px-6 py-10">
+      <PageHeader
+        title="Job descriptions"
+        description="Create a role, then review candidates against its parsed requirements."
+      />
 
-      <section className="mt-6 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-medium text-gray-900">New job description</h2>
+      <Card className="p-6">
+        <h2 className="text-base font-semibold text-slate-900">New job description</h2>
 
         {createError && (
-          <div
-            role="alert"
-            className="mt-4 flex items-start justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-          >
-            <span>{createError}</span>
-            <button
-              type="button"
-              onClick={() => setCreateError(null)}
-              className="shrink-0 font-medium text-red-700 hover:text-red-900"
-              aria-label="Dismiss error"
-            >
-              &times;
-            </button>
+          <div className="mt-4">
+            <ErrorBanner>{createError}</ErrorBanner>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
           <div>
-            <label htmlFor="jd-title" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="jd-title" className="block text-sm font-medium text-slate-700">
               Title
             </label>
             <input
@@ -99,12 +92,12 @@ export default function JobDescriptionsPage() {
               onChange={(e) => setTitle(e.target.value)}
               disabled={isCreating}
               placeholder="e.g. Senior Backend Engineer"
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
+              className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
             />
           </div>
 
           <div>
-            <label htmlFor="jd-raw-text" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="jd-raw-text" className="block text-sm font-medium text-slate-700">
               Job description text
             </label>
             <textarea
@@ -112,79 +105,61 @@ export default function JobDescriptionsPage() {
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
               disabled={isCreating}
-              rows={12}
+              rows={10}
               placeholder="Paste the raw job description here..."
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 disabled:bg-gray-100"
+              className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50"
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={isCreating}
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-            >
-              {isCreating ? "Parsing job description..." : "Create job description"}
-            </button>
+          <div className="flex items-center gap-3 pt-1">
+            <Button type="submit" disabled={isCreating}>
+              {isCreating && <Spinner className="h-4 w-4" />}
+              {isCreating ? "Parsing requirements…" : "Create job description"}
+            </Button>
             {isCreating && (
-              <span className="text-sm text-gray-500">
-                This can take a few seconds while the requirements are parsed.
-              </span>
+              <span className="text-sm text-slate-500">This can take a few seconds.</span>
             )}
           </div>
         </form>
-      </section>
+      </Card>
 
-      <section className="mt-8">
-        <h2 className="text-lg font-medium text-gray-900">All job descriptions</h2>
+      <div className="mt-10">
+        <h2 className="mb-4 text-base font-semibold text-slate-900">All job descriptions</h2>
 
-        {listError && (
-          <div
-            role="alert"
-            className="mt-4 flex items-start justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-          >
-            <span>{listError}</span>
-            <button
-              type="button"
-              onClick={() => setListError(null)}
-              className="shrink-0 font-medium text-red-700 hover:text-red-900"
-              aria-label="Dismiss error"
-            >
-              &times;
-            </button>
+        {listError && <ErrorBanner>{listError}</ErrorBanner>}
+
+        {isLoadingList && (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Spinner className="h-4 w-4" /> Loading job descriptions…
           </div>
         )}
 
-        {isLoadingList && <p className="mt-4 text-sm text-gray-500">Loading job descriptions...</p>}
-
         {!isLoadingList && !listError && jobDescriptions.length === 0 && (
-          <p className="mt-4 text-sm text-gray-500">No job descriptions yet. Create one above.</p>
+          <Card className="px-6 py-10 text-center">
+            <p className="text-sm text-slate-500">No job descriptions yet. Create one above to get started.</p>
+          </Card>
         )}
 
         {!isLoadingList && jobDescriptions.length > 0 && (
-          <ul className="mt-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             {jobDescriptions.map((jd) => (
-              <li key={jd.id}>
-                <Link
-                  to={`/jobs/${jd.id}`}
-                  className="block rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm transition hover:border-gray-400 hover:shadow-md"
-                >
+              <Link key={jd.id} to={`/jobs/${jd.id}`}>
+                <Card className="px-5 py-4 transition hover:border-indigo-300 hover:shadow-md">
                   <div className="flex items-center justify-between gap-4">
-                    <span className="font-medium text-gray-900">{jd.title}</span>
-                    <span className="shrink-0 text-xs text-gray-500">
-                      {formatDate(jd.created_at)}
-                    </span>
+                    <span className="font-semibold text-slate-900">{jd.title}</span>
+                    <span className="shrink-0 text-xs text-slate-400">{formatDate(jd.created_at)}</span>
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {jd.requirements.length} parsed requirement
-                    {jd.requirements.length === 1 ? "" : "s"}
-                  </p>
-                </Link>
-              </li>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Badge tone="primary">
+                      {jd.requirements.length} requirement{jd.requirements.length === 1 ? "" : "s"}
+                    </Badge>
+                  </div>
+                </Card>
+              </Link>
             ))}
-          </ul>
+          </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }
