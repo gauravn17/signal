@@ -38,8 +38,18 @@ class FakeLLMClient:
             return response_model.model_validate(
                 {
                     "requirements": [
-                        {"text": "5+ years Python", "category": "must_have", "source": "generic"},
-                        {"text": "On-call experience", "category": "nice_to_have", "source": "hiring_team_free_text"},
+                        {
+                            "text": "5+ years Python",
+                            "category": "must_have",
+                            "source": "generic",
+                            "requirement_type": "experience",
+                        },
+                        {
+                            "text": "On-call experience",
+                            "category": "nice_to_have",
+                            "source": "hiring_team_free_text",
+                            "requirement_type": "experience",
+                        },
                     ]
                 }
             )
@@ -60,14 +70,24 @@ class FakeLLMClient:
                         ],
                         "education": ["BS Computer Science"],
                     },
-                    "requirement_matches": [
+                    "requirement_assessments": [
                         {
-                            "requirement_text": "5+ years Python",
-                            "category": "must_have",
-                            "met": "yes",
-                            "evidence": "6 years at Acme as a Python engineer",
+                            "requirement_id": "req_001",
+                            "assessment": {
+                                "kind": "experience",
+                                "assessment": "strong",
+                                "duration": "6 years",
+                                "context": "professional",
+                                "evidence": [
+                                    {"excerpt": "6 years at Acme as a Python engineer", "source": "resume"}
+                                ],
+                                "gaps": [],
+                            },
                         }
                     ],
+                    "strengths": ["Strong, sustained professional Python experience"],
+                    "gaps": [],
+                    "evidence_confidence": "strong",
                     "fit_summary": "Strong match on core requirements.",
                 }
             )

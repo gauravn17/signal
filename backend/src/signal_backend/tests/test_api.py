@@ -166,6 +166,9 @@ def test_data_is_isolated_between_organizations(client):
     )
     candidate_id = candidate_response.json()["candidate"]["id"]
 
+    from uuid import uuid4
+
+    unique = uuid4()
     with Session(engine, expire_on_commit=False) as session:
         other_org = Organization(name="Other Org")
         session.add(other_org)
@@ -173,9 +176,9 @@ def test_data_is_isolated_between_organizations(client):
         session.refresh(other_org)
         other_user = User(
             organization_id=other_org.id,
-            email="other@example.com",
+            email=f"other-{unique}@example.com",
             role=UserRole.admin,
-            external_auth_id="other-external-id",
+            external_auth_id=f"other-external-id-{unique}",
         )
         session.add(other_user)
         session.commit()

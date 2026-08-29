@@ -41,5 +41,8 @@ class MatchResult(SQLModel, table=True):
     findings: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
     # Explicit disagreements between sources (e.g. resume vs. GitHub timeline).
     disagreements: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    # Stage 1 only: {"strengths": [...], "gaps": [...]} — role-specific, not
+    # tied to any single requirement. Null for older rows and for Stage 2.
+    assessment_details: Optional[dict] = Field(default=None, sa_column=Column(JSON))
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
